@@ -34,7 +34,13 @@ from .config import (
     get_storage,
 )
 from .credentials import generate_credentials, generate_credentials_static
-from .keys import ALL_KEYS
+from .keys import ALL_KEYS, KEY_LEFT_MOUSE
+from .remote_input import (
+    build_changesource_payload,
+    encode_mouse_rel,
+    input_literal,
+    send_text_literals,
+)
 from .protocol import AuthMethod, detect_protocol, get_auth_method, get_auth_method_order
 from .topics import (
     APPS,
@@ -53,6 +59,8 @@ from .topics import (
     TOPIC_GET_CAPABILITY,
     TOPIC_LAUNCH_APP,
     TOPIC_SEND_KEY,
+    TOPIC_MOUSE,
+    TOPIC_INPUT,
     TOPIC_SET_SOURCE,
     TOPIC_SET_VOLUME,
     TOPIC_APPS_RESPONSE,
@@ -1088,12 +1096,62 @@ class VidaaTV:
         topic = get_topic(TOPIC_GET_SOURCES, self.client_id)
         return self._request(topic, timeout=timeout)
 
-    def set_source(self, source: str, check_state: bool = False) -> bool:
+    def send_mouse_relative(self, dx: int, dy: int, check_state: bool = False) -> bool:
+        """Move the on-screen pointer by relative deltas.
+
+        Args:
+            dx: Horizontal delta (signed 16-bit)
+            dy: Vertical delta (signed 16-bit)
+            check_state: If True, check TV is on before sending
+
+        Returns:
+            True if sent successfully
+        """
+        if check_state and not self._is_tv_on():
+            _LOGGER.debug("TV is off. Mouse move not sent.")
+            return False
+        topic = get_topic(TOPIC_MOUSE, self.client_id)
+        return self._publish(topic, encode_mouse_rel(dx, dy))
+
+    def click_mouse(self, check_state: bool = False) -> bool:
+        """Send a left mouse button click."""
+        return self.send_key(KEY_LEFT_MOUSE, check_state=check_state)
+
+    def send_input(self, char: str, check_state: bool = False) -> bool:
+        """Send one on-screen keyboard character via ``actions/input``."""
+        if check_state and not self._is_tv_on():
+            _LOGGER.debug("TV is off. Input not sent.")
+            return False
+        topic = get_topic(TOPIC_INPUT, self.client_id)
+        return self._publish(topic, input_literal(char))
+
+    def send_text(self, text: str, check_state: bool = False, delay: float = 0.12) -> bool:
+        """Type text into the TV's focused field via ``actions/input``."""
+        if check_state and not self._is_tv_on():
+            _LOGGER.debug("TV is off. Text not sent.")
+            return False
+        if not text:
+            return True
+        topic = get_topic(TOPIC_INPUT, self.client_id)
+        try:
+            send_text_literals(self._publish, topic, text, delay=delay)
+        except ValueError:
+            _LOGGER.exception("Unsupported character in send_text")
+            return False
+        return True
+
+    def set_source(
+        self,
+        source: str,
+        check_state: bool = False,
+        source_entry: Optional[dict] = None,
+    ) -> bool:
         """Set input source.
 
         Args:
             source: Source name (hdmi1, hdmi2, tv, av) or source ID
             check_state: If True, check TV is on before sending
+            source_entry: Optional sourcelist dict for app-style payload
 
         Returns:
             True if sent successfully
@@ -1102,9 +1160,13 @@ class VidaaTV:
             print("TV is off. Command not sent.")
             return False
 
-        source_id = SOURCE_MAP.get(source.lower(), source)
         topic = get_topic(TOPIC_SET_SOURCE, self.client_id)
-        return self._publish(topic, {"sourceid": source_id})
+        if source_entry:
+            payload = build_changesource_payload(source_entry)
+        else:
+            source_id = SOURCE_MAP.get(source.lower(), source)
+            payload = {"sourceid": source_id}
+        return self._publish(topic, payload)
 
     # State
     def get_state(self, timeout: float = 5.0) -> Optional[dict]:

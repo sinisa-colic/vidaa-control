@@ -320,6 +320,34 @@ class AsyncVidaaTV:
             self._client.send_key, key, check_state=check_state
         )
 
+    async def async_send_mouse_relative(
+        self, dx: int, dy: int, check_state: bool = False
+    ) -> bool:
+        """Move the on-screen pointer by relative deltas."""
+        return await self._run_in_executor(
+            self._client.send_mouse_relative, dx, dy, check_state=check_state
+        )
+
+    async def async_click_mouse(self, check_state: bool = False) -> bool:
+        """Send a left mouse button click."""
+        return await self._run_in_executor(
+            self._client.click_mouse, check_state=check_state
+        )
+
+    async def async_send_input(self, char: str, check_state: bool = False) -> bool:
+        """Send one on-screen keyboard character."""
+        return await self._run_in_executor(
+            self._client.send_input, char, check_state=check_state
+        )
+
+    async def async_send_text(
+        self, text: str, check_state: bool = False, delay: float = 0.12
+    ) -> bool:
+        """Type text into the TV's focused field."""
+        return await self._run_in_executor(
+            self._client.send_text, text, check_state=check_state, delay=delay
+        )
+
     async def async_power(self) -> bool:
         """Toggle power."""
         return await self._run_in_executor(self._client.power)
@@ -431,19 +459,28 @@ class AsyncVidaaTV:
         )
 
     async def async_set_source(
-        self, source: str, check_state: bool = False
+        self,
+        source: str,
+        check_state: bool = False,
+        source_entry: Optional[dict] = None,
     ) -> bool:
         """Set input source.
 
         Args:
             source: Source name (hdmi1, hdmi2, tv, av) or ID
             check_state: Check TV is on first
+            source_entry: Optional sourcelist dict for app-style payload
 
         Returns:
             True if sent successfully
         """
         return await self._run_in_executor(
-            self._client.set_source, source, check_state=check_state
+            partial(
+                self._client.set_source,
+                source,
+                check_state=check_state,
+                source_entry=source_entry,
+            )
         )
 
     # State

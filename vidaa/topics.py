@@ -7,6 +7,8 @@ CLIENT_ID = DEFAULT_CLIENT_ID
 
 # Command topics (publish to these)
 TOPIC_SEND_KEY = "/remoteapp/tv/remote_service/{client}/actions/sendkey"
+TOPIC_MOUSE = "/remoteapp/tv/remote_service/{client}/actions/mouse"
+TOPIC_INPUT = "/remoteapp/tv/remote_service/{client}/actions/input"
 TOPIC_AUTH = "/remoteapp/tv/ui_service/{client}/actions/authenticationcode"
 TOPIC_AUTH_CLOSE = "/remoteapp/tv/ui_service/{client}/actions/authenticationcodeclose"
 TOPIC_VIDAA_CONNECT = "/remoteapp/tv/ui_service/{client}/actions/vidaa_app_connect"
